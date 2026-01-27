@@ -41,35 +41,46 @@ export async function POST(req) {
 
   const transporter_name = transporter?.name || "Transporter";
 
+  try {
+    // 3️⃣ AI structure reply
+    const structuredRows =
+      await structureTransporterReply(raw_reply_text);
 
+    if (!structuredRows.length) {
+      throw new Error("No structured rows returned");
+    }
 
-  // 3️⃣ AI structure reply
-  const structuredRows =
-    await structureTransporterReply(raw_reply_text);
+    // 4️⃣ Save structured rows in DB
+    const rowsForDb = structuredRows.map((r) => ({
+      transporter_response_id: reply.id,
+      transporter_name,
+      origin_city: r.origin_city,
+      destination_city: r.destination_city,
+      vehicle_type: r.vehicle_type,
+      weight_tons: r.weight_tons,
+      rate_pkr: r.rate_pkr,
+      availability_date: r.availability_date,
+      remarks: r.remarks,
+    }));
 
-  if (!structuredRows.length) {
-    return NextResponse.json({ success: true });
+    await supabaseServer.from("structured_rates").insert(rowsForDb);
+
+    // 5️⃣ Push structured rows to Google Sheets
+    await appendRatesToSheet(rowsForDb);
+
+  } catch (err) {
+    console.error("AI structuring failed, saving raw text only", err);
+
+    // 🔁 FALLBACK: append RAW reply to Google Sheets
+    await appendRatesToSheet([
+      {
+        transporter_name,
+        request_id,
+        raw_reply_text,
+        created_at: new Date().toISOString(),
+      },
+    ]);
   }
-
-  // 4️⃣ Save structured rows in DB
-  const rowsForDb = structuredRows.map((r) => ({
-    transporter_response_id: reply.id,
-    transporter_name,
-    origin_city: r.origin_city,
-    destination_city: r.destination_city,
-    vehicle_type: r.vehicle_type,
-    weight_tons: r.weight_tons,
-    rate_pkr: r.rate_pkr,
-    availability_date: r.availability_date,
-    remarks: r.remarks,
-  }));
-
-  await supabaseServer.from("structured_rates").insert(rowsForDb);
-
-
-
-  // 5️⃣ Push to Google Sheets
-  await appendRatesToSheet(rowsForDb);
 
   return NextResponse.json({ success: true });
 }
