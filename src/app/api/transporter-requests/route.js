@@ -2,33 +2,47 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "../../lib/supabaseServer";
 
 export async function GET(req) {
-  const transporter_id =
-    req.nextUrl.searchParams.get("transporter_id");
+  const transporter_id = req.nextUrl.searchParams.get("transporter_id");
 
   if (!transporter_id) {
     return NextResponse.json([], { status: 400 });
   }
 
-  // Fetch all requests
-  const { data: requests } = await supabaseServer
+  const { data, error } = await supabaseServer
     .from("requests")
-    .select("id, formatted_request_text, created_at")
+    .select(`
+      id,
+      movement_type,
+      formatted_request_text,
+      created_at,
+      transporter_replies (
+        transporter_id,
+        rate_pkr,
+        availability_date,
+        remarks
+      )
+    `)
     .order("created_at", { ascending: false });
 
-  // Fetch replies by this transporter
-  const { data: replies } = await supabaseServer
-    .from("transporter_replies")
-    .select("request_id")
-    .eq("transporter_id", transporter_id);
+  if (error) {
+    console.error(error);
+    return NextResponse.json([], { status: 500 });
+  }
 
-  const repliedRequestIds = new Set(
-    (replies || []).map((r) => r.request_id)
-  );
+  // attach THIS transporter's reply only
+  const mapped = data.map((r) => {
+    const myReply = r.transporter_replies?.find(
+      (rep) => rep.transporter_id === transporter_id
+    );
 
-  return NextResponse.json(
-    (requests || []).map((r) => ({
-      ...r,
-      alreadyReplied: repliedRequestIds.has(r.id),
-    }))
-  );
+    return {
+      id: r.id,
+      movement_type: r.movement_type,
+      formatted_request_text: r.formatted_request_text,
+      created_at: r.created_at,
+      my_reply: myReply || null,
+    };
+  });
+
+  return NextResponse.json(mapped);
 }

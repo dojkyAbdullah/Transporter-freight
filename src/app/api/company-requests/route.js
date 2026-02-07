@@ -8,16 +8,18 @@ export async function GET(req) {
     return NextResponse.json([], { status: 400 });
   }
 
-  // 1️⃣ Fetch requests with raw replies
   const { data: requests, error } = await supabaseServer
     .from("requests")
     .select(`
       id,
+      movement_type,
       formatted_request_text,
       created_at,
       transporter_replies (
         id,
-        raw_reply_text,
+        rate_pkr,
+        availability_date,
+        remarks,
         transporter_id
       )
     `)
@@ -25,42 +27,53 @@ export async function GET(req) {
     .order("created_at", { ascending: false });
 
   if (error || !requests) {
+    console.error(error);
     return NextResponse.json([], { status: 500 });
   }
 
-  // 2️⃣ Collect unique transporter IDs
-  const transporterIds = new Set();
-  for (const req of requests) {
-    for (const reply of req.transporter_replies || []) {
-      transporterIds.add(reply.transporter_id);
-    }
-  }
+  // Fetch transporter names
+  const transporterIds = [
+    ...new Set(
+      requests.flatMap(r =>
+        (r.transporter_replies || []).map(t => t.transporter_id)
+      )
+    ),
+  ];
 
-  // 3️⃣ Fetch transporter names in ONE query
   let transporterMap = {};
-  if (transporterIds.size > 0) {
+  if (transporterIds.length) {
     const { data: users } = await supabaseServer
       .from("users")
       .select("id, name")
-      .in("id", Array.from(transporterIds));
+      .in("id", transporterIds);
 
-    for (const u of users || []) {
+    users?.forEach(u => {
       transporterMap[u.id] = u.name;
-    }
+    });
   }
 
-  // 4️⃣ Build final response (NO mutation)
-  const formattedRequests = requests.map((req) => ({
-    id: req.id,
-    formatted_request_text: req.formatted_request_text,
-    created_at: req.created_at,
-    replies: (req.transporter_replies || []).map((r) => ({
+  return NextResponse.json(
+    requests.map(r => ({
       id: r.id,
-      raw_reply_text: r.raw_reply_text,
-      transporter_id: r.transporter_id,
-      transporter_name: transporterMap[r.transporter_id] || "Transporter",
-    })),
-  }));
+      movement_type: r.movement_type,
+      formatted_request_text: r.formatted_request_text,
+      created_at: r.created_at,
+      replies: (r.transporter_replies || []).map(rep => ({
+        id: rep.id,
+        transporter_name:
+          transporterMap[rep.transporter_id] || "Transporter",
 
-  return NextResponse.json(formattedRequests);
+        // 👇 Generated display text
+        reply_text: [
+          rep.rate_pkr ? `Rate: PKR ${rep.rate_pkr}` : null,
+          rep.availability_date
+            ? `Available: ${rep.availability_date}`
+            : null,
+          rep.remarks ? `Remarks: ${rep.remarks}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      })),
+    }))
+  );
 }

@@ -1,55 +1,60 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../lib/supabaseServer";
-import { formatRequestWithGemini } from "../../lib/gemini";
-import { sendBroadcastEmail } from "../../lib/email";
 
 export async function POST(req) {
-  const { message, company_id } = await req.json();
+  const body = await req.json();
+  const { company_id, movement_type } = body;
 
-  if (!company_id || !message) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  if (!company_id || !movement_type) {
+    return NextResponse.json(
+      { error: "Invalid payload" },
+      { status: 400 }
+    );
   }
 
-  // 1️⃣ Format request with Gemini
-  const formatted = await formatRequestWithGemini(message);
+  // 🧠 Create human-readable summary (NO AI)
+  let formatted = "";
 
-  // 2️⃣ Get company info
-  const { data: company } = await supabaseServer
-    .from("users")
-    .select("name, company_name")
-    .eq("id", company_id)
-    .single();
+  if (movement_type === "PORT") {
+    formatted = `
+Port Movement | ${body.import_export}
+Commodity: ${body.port_commodity}
+Container: ${body.container_count} x ${body.container_size}
+Weight: ${body.weight_per_container} MT / container
+Lane: ${body.port_lane}
+Loading: ${body.loading_date}
+Cut-off: ${body.cutoff_date}
+    `.trim();
+  }
 
-  // 3️⃣ Save request
-  const { data: request, error } = await supabaseServer
+  if (movement_type === "UPCOUNTRY") {
+    formatted = `
+Upcountry Dispatch
+Commodity: ${body.upcountry_commodity}
+Truck: ${body.truck_type} (${body.bed_size})
+Weight: ${body.total_weight} MT
+Lane: ${body.upcountry_lane}
+Customer: ${body.customer_name}
+Loading: ${body.loading_date}
+    `.trim();
+  }
+
+  const { error } = await supabaseServer
     .from("requests")
     .insert({
       company_id,
-      raw_request_text: message,
+      movement_type,
+      raw_request_text: JSON.stringify(body),
       formatted_request_text: formatted,
-    })
-    .select()
-    .single();
+      form_data: body, // ✅ full structured data
+    });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // 4️⃣ Fetch all transporters
-  const { data: transporters } = await supabaseServer
-    .from("users")
-    .select("email")
-    .eq("role", "TRANSPORTER");
-
-  // 5️⃣ Send email to each transporter (fire-and-forget)
-  for (const t of transporters || []) {
-    if (!t.email) continue;
-
-    sendBroadcastEmail({
-      to: t.email,
-      companyName: company?.company_name || company?.name,
-      requestText: formatted,
-    }).catch(console.error);
+    console.error(error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ success: true });
