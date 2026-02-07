@@ -428,42 +428,66 @@ export default function CompanyDashboard() {
 
         {/* ================= REQUESTS ================= */}
         <div className="bg-white rounded-2xl shadow p-6 overflow-y-auto max-h-[85vh]">
-          <h2 className="text-xl font-semibold text-slate-800 mb-4">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">
             Submitted Requests
           </h2>
 
+          {requests.length === 0 && (
+            <p className="text-sm text-slate-500">No requests submitted yet.</p>
+          )}
+
           {requests.map((r) => (
-            <div key={r.id} className="border rounded-xl p-4 mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+            <div
+              key={r.id}
+              className="border border-slate-200 rounded-xl p-4 mb-4 bg-slate-50"
+            >
+              {/* ===== HEADER ===== */}
+              <div className="flex justify-between items-center mb-3">
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold text-white
+            ${r.movement_type === "PORT" ? "bg-indigo-600" : "bg-emerald-600"}`}
+                >
                   {r.movement_type}
                 </span>
+
                 <button
                   onClick={() => handleDelete(r.id)}
-                  className="text-sm text-red-600 hover:text-red-800"
+                  className="text-sm text-red-600 hover:text-red-800 font-medium"
                 >
                   Delete
                 </button>
               </div>
 
+              {/* ===== DATE ===== */}
               <p className="text-xs text-slate-500 mb-2">
                 {new Date(r.created_at).toLocaleString()}
               </p>
 
-              <p className="text-sm text-slate-800 mb-3">
+              {/* ===== REQUEST TEXT ===== */}
+              <p className="text-sm text-slate-900 leading-relaxed mb-4 whitespace-pre-line">
                 {r.formatted_request_text || r.raw_request_text}
               </p>
 
-              <p className="text-sm font-semibold text-slate-700">
+              {/* ===== REPLIES ===== */}
+              <p className="text-sm font-semibold text-slate-900 mb-2">
                 Transporter Replies
               </p>
 
-              {r.replies.map((rep) => (
+              {(!r.replies || r.replies.length === 0) && (
+                <p className="text-sm text-slate-500 italic">No replies yet</p>
+              )}
+
+              {r.replies?.map((rep) => (
                 <div
                   key={rep.id}
-                  className="mt-2 bg-slate-50 rounded-lg p-2 text-sm"
+                  className="mt-2 bg-white border border-slate-200 rounded-lg p-3 text-sm"
                 >
-                  <b>{rep.transporter_name}:</b> {rep.reply_text}
+                  <span className="font-semibold text-indigo-700">
+                    {rep.transporter_name}:
+                  </span>{" "}
+                  <span className="text-slate-800">
+                    {rep.reply_text || rep.raw_reply_text}
+                  </span>
                 </div>
               ))}
             </div>
