@@ -13,6 +13,7 @@ export async function GET(req) {
     .select(`
       id,
       movement_type,
+      status,
       formatted_request_text,
       created_at,
       transporter_replies (
@@ -29,8 +30,7 @@ export async function GET(req) {
     return NextResponse.json([], { status: 500 });
   }
 
-  // attach THIS transporter's reply only
-  const mapped = data.map((r) => {
+  const mapped = (data || []).map((r) => {
     const myReply = r.transporter_replies?.find(
       (rep) => rep.transporter_id === transporter_id
     );
@@ -38,6 +38,7 @@ export async function GET(req) {
     return {
       id: r.id,
       movement_type: r.movement_type,
+      status: r.status,
       formatted_request_text: r.formatted_request_text,
       created_at: r.created_at,
       my_reply: myReply || null,

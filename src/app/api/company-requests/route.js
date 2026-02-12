@@ -10,19 +10,24 @@ export async function GET(req) {
 
   const { data: requests, error } = await supabaseServer
     .from("requests")
-    .select(`
-      id,
-      movement_type,
-      formatted_request_text,
-      created_at,
-      transporter_replies (
-        id,
-        rate_pkr,
-        availability_date,
-        remarks,
-        transporter_id
-      )
-    `)
+    .select(
+      `
+  id,
+  movement_type,
+  formatted_request_text,
+  created_at,
+  status,
+  reference_number,
+  transporter_replies (
+    id,
+    rate_pkr,
+    availability_date,
+    remarks,
+    transporter_id
+  )
+`,
+    )
+
     .eq("company_id", company_id)
     .order("created_at", { ascending: false });
 
@@ -34,9 +39,9 @@ export async function GET(req) {
   // Fetch transporter names
   const transporterIds = [
     ...new Set(
-      requests.flatMap(r =>
-        (r.transporter_replies || []).map(t => t.transporter_id)
-      )
+      requests.flatMap((r) =>
+        (r.transporter_replies || []).map((t) => t.transporter_id),
+      ),
     ),
   ];
 
@@ -47,33 +52,32 @@ export async function GET(req) {
       .select("id, name")
       .in("id", transporterIds);
 
-    users?.forEach(u => {
+    users?.forEach((u) => {
       transporterMap[u.id] = u.name;
     });
   }
 
   return NextResponse.json(
-    requests.map(r => ({
+    requests.map((r) => ({
       id: r.id,
       movement_type: r.movement_type,
       formatted_request_text: r.formatted_request_text,
       created_at: r.created_at,
-      replies: (r.transporter_replies || []).map(rep => ({
+      status: r.status,
+      reference_number: r.reference_number,
+      replies: (r.transporter_replies || []).map((rep) => ({
         id: rep.id,
-        transporter_name:
-          transporterMap[rep.transporter_id] || "Transporter",
+        transporter_name: transporterMap[rep.transporter_id] || "Transporter",
 
         // 👇 Generated display text
         reply_text: [
           rep.rate_pkr ? `Rate: PKR ${rep.rate_pkr}` : null,
-          rep.availability_date
-            ? `Available: ${rep.availability_date}`
-            : null,
+          rep.availability_date ? `Available: ${rep.availability_date}` : null,
           rep.remarks ? `Remarks: ${rep.remarks}` : null,
         ]
           .filter(Boolean)
           .join(" | "),
       })),
-    }))
+    })),
   );
 }

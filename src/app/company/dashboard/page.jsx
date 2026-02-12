@@ -146,11 +146,12 @@ const Textarea = ({ label, ...props }) => (
     />
   </div>
 );
-
 export default function CompanyDashboard() {
   const [loading, setLoading] = useState(false);
   const [requests, setRequests] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [closingId, setClosingId] = useState(null);
+  const [referenceNumber, setReferenceNumber] = useState("");
 
   async function fetchRequests() {
     const { data: auth } = await supabase.auth.getUser();
@@ -174,7 +175,6 @@ export default function CompanyDashboard() {
 
     setLoading(false);
     setForm(INITIAL_FORM);
-
     fetchRequests();
   }
 
@@ -191,6 +191,44 @@ export default function CompanyDashboard() {
     fetchRequests();
   }
 
+  async function handleCloseRequest(id) {
+    if (!referenceNumber.trim()) {
+      alert("Reference number is required to close request.");
+      return;
+    }
+
+    const { data: auth } = await supabase.auth.getUser();
+
+    await fetch("/api/close-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        request_id: id,
+        company_id: auth.user.id,
+        reference_number: referenceNumber,
+      }),
+    });
+
+    setClosingId(null);
+    setReferenceNumber("");
+    fetchRequests();
+  }
+
+  async function handleReopen(id) {
+    const { data: auth } = await supabase.auth.getUser();
+
+    await fetch("/api/reopen-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        request_id: id,
+        company_id: auth.user.id,
+      }),
+    });
+
+    fetchRequests();
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-8">
@@ -198,6 +236,7 @@ export default function CompanyDashboard() {
       </h1>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
         {/* ================= RFQ FORM ================= */}
         <div className="bg-white rounded-2xl shadow p-6 space-y-6">
           <h2 className="text-xl font-semibold text-slate-800">
@@ -205,7 +244,7 @@ export default function CompanyDashboard() {
           </h2>
 
           <Input
-            label="Required Loading Date"
+            label="Loading Date"
             type="date"
             value={form.loading_date}
             onChange={(e) =>
@@ -216,205 +255,14 @@ export default function CompanyDashboard() {
           <Select
             label="Movement Type"
             value={form.movement_type}
-            onChange={(e) => {
-              setForm((f) => ({ ...f, movement_type: e.target.value }));
-            }}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, movement_type: e.target.value }))
+            }
           >
             <option value="">Select</option>
             <option value="PORT">Port Movement</option>
             <option value="UPCOUNTRY">Upcountry Dispatch</option>
           </Select>
-
-          {form.movement_type === "PORT" && (
-            <div className="border rounded-xl p-4 space-y-4 bg-slate-50">
-              <h3 className="font-semibold text-indigo-600">Port Movement</h3>
-
-              <Select
-                label="Commodity"
-                value={form.port_commodity}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, port_commodity: e.target.value }))
-                }
-              >
-                <option>Preform</option>
-                <option>Resin</option>
-                <option>BOPET Film Roll</option>
-                <option>Thermoforming</option>
-                <option>Yarn</option>
-                <option>Others</option>
-              </Select>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Container Size"
-                  value={form.container_size}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, container_size: e.target.value }))
-                  }
-                >
-                  <option>20ft</option>
-                  <option>40ft</option>
-                </Select>
-
-                <Input
-                  label="Container Count"
-                  value={form.container_count}
-                  type="number"
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, container_count: e.target.value }))
-                  }
-                />
-              </div>
-
-              <Input
-                label="Weight per Container (MT)"
-                value={form.weight_per_container}
-                type="number"
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    weight_per_container: e.target.value,
-                  }))
-                }
-              />
-
-              <Select
-                label="Import / Export"
-                value={form.import_export}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, import_export: e.target.value }))
-                }
-              >
-                <option>Import</option>
-                <option>Export</option>
-              </Select>
-
-              <Select
-                label="Lane"
-                value={form.port_lane}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, port_lane: e.target.value }))
-                }
-              >
-                <option value="">Select Lane</option>
-                {PORT_LANES.map((lane) => (
-                  <option key={lane} value={lane}>
-                    {lane}
-                  </option>
-                ))}
-              </Select>
-
-              <Input
-                label="Cut-off / Demurrage Date"
-                type="date"
-                value={form.cutoff_date}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, cutoff_date: e.target.value }))
-                }
-              />
-
-              <Textarea
-                label="Special Instructions"
-                value={form.special_instructions}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    special_instructions: e.target.value,
-                  }))
-                }
-              />
-            </div>
-          )}
-
-          {form.movement_type === "UPCOUNTRY" && (
-            <div className="border rounded-xl p-4 space-y-4 bg-slate-50">
-              <h3 className="font-semibold text-indigo-600">
-                Upcountry Dispatch
-              </h3>
-
-              <Select
-                label="Commodity"
-                value={form.upcountry_commodity}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    upcountry_commodity: e.target.value,
-                  }))
-                }
-              >
-                <option>Preform</option>
-                <option>Resin (25kg)</option>
-                <option>BOPET Film Roll</option>
-                <option>Thermoforming</option>
-                <option>Yarn</option>
-              </Select>
-
-              <Select
-                label="Truck Type"
-                value={form.truck_type}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, truck_type: e.target.value }))
-                }
-              >
-                <option>Container</option>
-                <option>Flat Bed</option>
-              </Select>
-
-              <Select
-                label="Bed Size"
-                value={form.bed_size}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, bed_size: e.target.value }))
-                }
-              >
-                <option>20ft</option>
-                <option>40ft</option>
-              </Select>
-
-              <Input
-                label="Total Weight (MT)"
-                value={form.total_weight}
-                type="number"
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, total_weight: e.target.value }))
-                }
-              />
-
-              <Select
-                label="Lane"
-                value={form.upcountry_lane}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, upcountry_lane: e.target.value }))
-                }
-              >
-                <option value="">Select Lane</option>
-                {UPCOUNTRY_LANES.map((lane) => (
-                  <option key={lane} value={lane}>
-                    {lane}
-                  </option>
-                ))}
-              </Select>
-
-              <Input
-                label="Customer Name"
-                value={form.customer_name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, customer_name: e.target.value }))
-                }
-              />
-
-              <Textarea
-                label="Special Instructions"
-                value={form.upcountry_instructions}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    upcountry_instructions: e.target.value,
-                  }))
-                }
-              />
-            </div>
-          )}
 
           <button
             onClick={handleSubmit}
@@ -422,7 +270,7 @@ export default function CompanyDashboard() {
             className="w-full bg-indigo-600 text-white py-3 rounded-xl
                        hover:bg-indigo-700 transition font-medium"
           >
-            {loading ? "Submitting RFQ..." : "Submit RFQ"}
+            {loading ? "Submitting..." : "Submit RFQ"}
           </button>
         </div>
 
@@ -432,62 +280,103 @@ export default function CompanyDashboard() {
             Submitted Requests
           </h2>
 
-          {requests.length === 0 && (
-            <p className="text-sm text-slate-500">No requests submitted yet.</p>
-          )}
-
           {requests.map((r) => (
             <div
               key={r.id}
               className="border border-slate-200 rounded-xl p-4 mb-4 bg-slate-50"
             >
-              {/* ===== HEADER ===== */}
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex justify-between items-center mb-2">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold text-white
-            ${r.movement_type === "PORT" ? "bg-indigo-600" : "bg-emerald-600"}`}
+                  ${r.status === "CLOSED" ? "bg-red-600" : "bg-green-600"}`}
                 >
-                  {r.movement_type}
+                  {r.status}
                 </span>
 
-                <button
-                  onClick={() => handleDelete(r.id)}
-                  className="text-sm text-red-600 hover:text-red-800 font-medium"
-                >
-                  Delete
-                </button>
+                <div className="flex gap-3">
+                  {r.status === "OPEN" && (
+                    <button
+                      onClick={() => setClosingId(r.id)}
+                      className="text-sm text-amber-600 font-medium"
+                    >
+                      Close
+                    </button>
+                  )}
+
+                  {r.status === "CLOSED" && (
+                    <button
+                      onClick={() => handleReopen(r.id)}
+                      className="text-sm text-green-600 font-medium"
+                    >
+                      Reopen
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    className="text-sm text-red-600 font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
 
-              {/* ===== DATE ===== */}
+              {r.reference_number && (
+                <p className="text-xs text-indigo-600 font-medium">
+                  Ref: {r.reference_number}
+                </p>
+              )}
+
               <p className="text-xs text-slate-500 mb-2">
                 {new Date(r.created_at).toLocaleString()}
               </p>
 
-              {/* ===== REQUEST TEXT ===== */}
-              <p className="text-sm text-slate-900 leading-relaxed mb-4 whitespace-pre-line">
-                {r.formatted_request_text || r.raw_request_text}
+              <p className="text-sm text-slate-900 mb-4 whitespace-pre-line">
+                {r.formatted_request_text}
               </p>
 
-              {/* ===== REPLIES ===== */}
+              {/* Close input */}
+              {closingId === r.id && (
+                <div className="bg-white p-3 rounded-lg border space-y-2">
+                  <Input
+                    label="Reference Number"
+                    value={referenceNumber}
+                    onChange={(e) =>
+                      setReferenceNumber(e.target.value)
+                    }
+                  />
+
+                  <button
+                    onClick={() => handleCloseRequest(r.id)}
+                    className="w-full bg-red-600 text-white py-2 rounded-lg"
+                  >
+                    Confirm Close
+                  </button>
+                </div>
+              )}
+
+              {/* Replies */}
               <p className="text-sm font-semibold text-slate-900 mb-2">
-                Transporter Replies
+                Transporter Rates
               </p>
 
-              {(!r.replies || r.replies.length === 0) && (
-                <p className="text-sm text-slate-500 italic">No replies yet</p>
+              {r.replies?.length === 0 && (
+                <p className="text-sm text-slate-500 italic">
+                  No rates submitted yet
+                </p>
               )}
 
               {r.replies?.map((rep) => (
                 <div
                   key={rep.id}
-                  className="mt-2 bg-white border border-slate-200 rounded-lg p-3 text-sm"
+                  className="mt-2 bg-white border rounded-lg p-3 text-sm"
                 >
-                  <span className="font-semibold text-indigo-700">
-                    {rep.transporter_name}:
-                  </span>{" "}
-                  <span className="text-slate-800">
-                    {rep.reply_text || rep.raw_reply_text}
-                  </span>
+                  <b className="text-indigo-700">
+                    {rep.transporter_name}
+                  </b>
+                  <div className="text-slate-800 mt-1">
+                    {rep.reply_text}
+                  </div>
                 </div>
               ))}
             </div>
