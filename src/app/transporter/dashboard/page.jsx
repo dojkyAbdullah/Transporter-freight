@@ -48,32 +48,43 @@ export default function TransporterDashboard() {
     fetchRequests();
   }, []);
 
-  async function submitRate(requestId) {
-    const payload = rates[requestId];
-    if (!payload?.rate_pkr) return alert("Enter rate");
+ async function submitRate(requestId) {
+  const payload = rates[requestId];
 
-    setLoadingId(requestId);
-    const { data: auth } = await supabase.auth.getUser();
-
-    const res = await fetch("/api/submit-reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        request_id: requestId,
-        transporter_id: auth.user.id,
-        ...payload,
-      }),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      alert(result.error);
-    }
-
-    setLoadingId(null);
-    fetchRequests();
+  if (!payload?.rate_pkr) {
+    alert("Please enter rate");
+    return;
   }
+
+  if (!payload?.availability_date) {
+    alert("Please select availability date");
+    return;
+  }
+
+  setLoadingId(requestId);
+
+  const { data: auth } = await supabase.auth.getUser();
+
+  const res = await fetch("/api/submit-reply", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      request_id: requestId,
+      transporter_id: auth.user.id,
+      ...payload,
+    }),
+  });
+
+  const result = await res.json();
+
+  if (!res.ok) {
+    alert(result.error);
+  }
+
+  setLoadingId(null);
+  fetchRequests();
+}
+
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
@@ -134,6 +145,7 @@ export default function TransporterDashboard() {
                   label="Availability Date"
                   type="date"
                   disabled={isClosed}
+                  required
                   value={rates[r.id]?.availability_date || ""}
                   onChange={(e) =>
                     setRates((p) => ({
