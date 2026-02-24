@@ -790,7 +790,7 @@ export default function CompanyDashboard() {
                                 key={rep.id}
                                 className="flex flex-wrap items-center gap-2"
                               >
-                                <span className="text-sm text-slate-700 min-w-[120px]">
+                                <span className="text-sm text-slate-700 min-w-30">
                                   {rep.transporter_name}
                                   {rep.rate_pkr != null && (
                                     <span className="text-slate-500 ml-1">
