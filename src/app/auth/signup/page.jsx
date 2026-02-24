@@ -92,7 +92,7 @@ return (
                    focus:border-blue-500 bg-white"
       >
         <option value="">Select Role</option>
-        <option value="COMPANY">Company</option>
+        <option value="INLAND_EXECUTIVE">Inland Executive</option>
         <option value="TRANSPORTER">Transporter</option>
       </select>
 

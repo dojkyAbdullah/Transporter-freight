@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../lib/supabaseServer";
 import { appendRatesToSheet } from "../../lib/googleSheets";
+import { getUserRole, canGiveQuotes } from "../../lib/getUserRole";
 
 export async function POST(req) {
   const { request_id, transporter_id, rate_pkr, availability_date, remarks } =
     await req.json();
+
+  const role = transporter_id ? await getUserRole(transporter_id) : null;
+  if (!canGiveQuotes(role)) {
+    return NextResponse.json(
+      { error: "Only Transporter role can submit quotes" },
+      { status: 403 }
+    );
+  }
 
   // 🔒 Fetch request
   const { data: request, error } = await supabaseServer

@@ -15,6 +15,8 @@ export async function GET(req) {
       movement_type,
       status,
       formatted_request_text,
+      form_data,
+      target_transporter_ids,
       created_at,
       transporter_replies (
         transporter_id,
@@ -30,7 +32,16 @@ export async function GET(req) {
     return NextResponse.json([], { status: 500 });
   }
 
-  const mapped = (data || []).map((r) => {
+  const filtered =
+    data == null
+      ? []
+      : data.filter((r) => {
+          const ids = r.target_transporter_ids;
+          if (ids == null || !Array.isArray(ids) || ids.length === 0) return true;
+          return ids.includes(transporter_id);
+        });
+
+  const mapped = filtered.map((r) => {
     const myReply = r.transporter_replies?.find(
       (rep) => rep.transporter_id === transporter_id
     );
@@ -40,6 +51,7 @@ export async function GET(req) {
       movement_type: r.movement_type,
       status: r.status,
       formatted_request_text: r.formatted_request_text,
+      form_data: r.form_data || null,
       created_at: r.created_at,
       my_reply: myReply || null,
     };

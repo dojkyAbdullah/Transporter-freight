@@ -22,7 +22,9 @@ export default function DashboardRedirect() {
         .eq("id", auth.user.id)
         .single();
 
-      if (user?.role === "COMPANY") {
+      if (user?.role === "ADMIN") {
+        router.replace("/admin/dashboard");
+      } else if (user?.role === "INLAND_EXECUTIVE" || user?.role === "COMPANY") {
         router.replace("/company/dashboard");
       } else if (user?.role === "TRANSPORTER") {
         router.replace("/transporter/dashboard");
@@ -34,5 +36,21 @@ export default function DashboardRedirect() {
     checkRole();
   }, [router]);
 
-  return <p className="p-4">Redirecting...</p>;
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace("/auth/login");
+  }
+
+  return (
+    <div className="p-4 flex items-center justify-between">
+      <p>Redirecting...</p>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="text-slate-600 hover:text-slate-900 font-medium text-sm"
+      >
+        Logout
+      </button>
+    </div>
+  );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import RequestDetails from "../../components/RequestDetails";
 
 const Input = ({ label, disabled, ...props }) => (
   <div className="space-y-1">
@@ -17,21 +19,24 @@ const Input = ({ label, disabled, ...props }) => (
 );
 
 export default function TransporterDashboard() {
+  const router = useRouter();
+  const [accessAllowed, setAccessAllowed] = useState(false);
   const [requests, setRequests] = useState([]);
   const [rates, setRates] = useState({});
   const [loadingId, setLoadingId] = useState(null);
 
   async function fetchRequests() {
-    const { data: auth } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
     const res = await fetch(
-      `/api/transporter-requests?transporter_id=${auth.user.id}`
+      `/api/transporter-requests?transporter_id=${session.user.id}`
     );
     const data = await res.json();
 
-    setRequests(data);
+    setRequests(Array.isArray(data) ? data : []);
 
     const initialRates = {};
-    data.forEach((r) => {
+    (Array.isArray(data) ? data : []).forEach((r) => {
       if (r.my_reply) {
         initialRates[r.id] = {
           rate_pkr: r.my_reply.rate_pkr || "",
@@ -45,8 +50,36 @@ export default function TransporterDashboard() {
   }
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    let mounted = true;
+    async function checkAccess() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (!session?.user) {
+        router.replace("/auth/login");
+        return;
+      }
+      const { data: user } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      if (!mounted) return;
+      if (user?.role !== "TRANSPORTER") {
+        router.replace("/dashboard");
+        return;
+      }
+      setAccessAllowed(true);
+      fetchRequests();
+    }
+    checkAccess();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      if (mounted) checkAccess();
+    });
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [router]);
 
  async function submitRate(requestId) {
   const payload = rates[requestId];
@@ -85,12 +118,29 @@ export default function TransporterDashboard() {
   fetchRequests();
 }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace("/auth/login");
+  }
+
+  if (!accessAllowed) {
+    return <p className="p-4">Checking access...</p>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
-      <h1 className="text-3xl font-bold text-slate-900 mb-8">
-        Transporter Dashboard
-      </h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-slate-900">
+          Transporter Dashboard
+        </h1>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-slate-600 hover:text-slate-900 font-medium"
+        >
+          Logout
+        </button>
+      </div>
 
       <div className="space-y-8">
         {requests.map((r) => {
@@ -115,10 +165,14 @@ export default function TransporterDashboard() {
                 </span>
               </div>
 
-              {/* DETAILS */}
-              <p className="text-sm text-slate-700 whitespace-pre-line">
-                {r.formatted_request_text}
-              </p>
+              {/* DETAILS - all fields (container size, special instructions, etc.) */}
+              <div className="text-sm">
+                <RequestDetails
+                  movement_type={r.movement_type}
+                  form_data={r.form_data}
+                  formatted_request_text={r.formatted_request_text}
+                />
+              </div>
 
               {isClosed && (
                 <p className="text-sm text-red-600 font-medium">
