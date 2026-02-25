@@ -322,7 +322,7 @@ export default function CompanyDashboard() {
 
   async function handleCloseRequest(id, companyId, request) {
     if (!referenceNumber.trim()) {
-      alert("Reference number is required to close request.");
+      alert("SAP Reference number is required to close request.");
       return;
     }
 
@@ -763,7 +763,7 @@ export default function CompanyDashboard() {
               {closingId === r.id && (
                 <div className="bg-white p-4 rounded-lg border space-y-4">
                   <Input
-                    label="Reference Number *"
+                    label="SAP Reference Number *"
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
                   />
