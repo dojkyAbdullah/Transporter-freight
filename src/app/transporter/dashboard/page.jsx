@@ -122,30 +122,40 @@ export default function TransporterDashboard() {
       return;
     }
 
-    setLoadingId(requestId);
-
-    const { data: auth } = await supabase.auth.getUser();
-
-    const res = await fetch("/api/submit-reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        request_id: requestId,
-        transporter_id: auth.user.id,
-        ...payload,
-      }),
-    });
-
-    const result = await res.json();
-    setLoadingId(null);
-
-    if (!res.ok) {
-      toast.error(result.error || "Failed to save rate");
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("You're offline. Please connect to the internet to submit your rate.");
       return;
     }
 
-    toast.success("Rate saved successfully");
-    fetchRequests();
+    setLoadingId(requestId);
+
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+
+      const res = await fetch("/api/submit-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_id: requestId,
+          transporter_id: auth.user.id,
+          ...payload,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.error || "Failed to save rate");
+        return;
+      }
+
+      toast.success("Rate saved successfully");
+      fetchRequests();
+    } catch (err) {
+      toast.error("Network error. Please check your connection and try again.");
+    } finally {
+      setLoadingId(null);
+    }
   }
 
   async function handleLogout() {

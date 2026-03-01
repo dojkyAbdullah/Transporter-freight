@@ -151,6 +151,12 @@ Once you see the notification in the browser (and optionally in the PWA), notifi
 
 ## 6. Troubleshooting
 
+- **Browser never asks for permission / table stays empty:**  
+  - Ensure **`NEXT_PUBLIC_VAPID_PUBLIC_KEY`** (and **`VAPID_PRIVATE_KEY`**) are set in `.env` and the dev server was restarted. Without the public key, the app won’t show the notification card or request permission.  
+  - After logging in, the app shows a small card: “Get notified of new requests and rates”. If permission is still “default”, the browser prompt may also appear automatically after a few seconds.  
+  - Click **Enable notifications** on the card if you don’t see the browser prompt.  
+  - Ensure the **service worker** is registered (PWA or first visit); push requires `navigator.serviceWorker.ready` before subscribing.
+
 - **No notifications:**  
   - Confirm **VAPID** keys are set and the **push_subscriptions** table exists and has rows for the test user.  
   - In the browser, check **Site settings → Notifications** and ensure they’re allowed.  

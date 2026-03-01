@@ -352,39 +352,95 @@ export default function CompanyDashboard() {
         toast.error("Please select a commodity for Port Movement");
         return;
       }
+      if (form.container_count == null || String(form.container_count).trim() === "") {
+        toast.error("Please enter container count");
+        return;
+      }
+      if (!form.container_size?.trim()) {
+        toast.error("Please select container size");
+        return;
+      }
+      if (form.weight_per_container == null || String(form.weight_per_container).trim() === "") {
+        toast.error("Please enter weight per container (MT)");
+        return;
+      }
+      if (!form.import_export?.trim()) {
+        toast.error("Please select Import or Export");
+        return;
+      }
+      if (!form.port_lane?.trim()) {
+        toast.error("Please select a port lane");
+        return;
+      }
+      if (!form.cutoff_date?.trim()) {
+        toast.error("Please enter cut-off date");
+        return;
+      }
+      // special_instructions is optional (remarks)
     }
     if (form.movement_type === "UPCOUNTRY") {
       if (!form.upcountry_commodity?.trim()) {
         toast.error("Please select a commodity for Upcountry Dispatch");
         return;
       }
+      if (!form.truck_type?.trim()) {
+        toast.error("Please select truck type");
+        return;
+      }
+      if (!form.bed_size?.trim()) {
+        toast.error("Please select bed size");
+        return;
+      }
+      if (form.total_weight == null || String(form.total_weight).trim() === "") {
+        toast.error("Please enter total weight (MT)");
+        return;
+      }
+      if (!form.upcountry_lane?.trim()) {
+        toast.error("Please select an upcountry lane");
+        return;
+      }
+      if (!form.customer_name?.trim()) {
+        toast.error("Please enter customer name");
+        return;
+      }
+      // upcountry_instructions is optional (remarks)
     }
 
-    setLoading(true);
-    const { data: auth } = await supabase.auth.getUser();
-    const res = await fetch("/api/create-request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company_id: auth.user.id,
-        caller_id: auth.user.id,
-        ...form,
-        target_transporter_ids:
-          selectedTransporterIds.length > 0 ? selectedTransporterIds : null,
-      }),
-    });
-    setLoading(false);
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      toast.error(data.error || "Failed to submit RFQ");
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("You're offline. Please connect to the internet to create a request.");
       return;
     }
 
-    setForm(INITIAL_FORM);
-    setSelectedTransporterIds([]);
-    fetchRequests();
-    toast.success("RFQ submitted successfully");
+    setLoading(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const res = await fetch("/api/create-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: auth.user.id,
+          caller_id: auth.user.id,
+          ...form,
+          target_transporter_ids:
+            selectedTransporterIds.length > 0 ? selectedTransporterIds : null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to submit RFQ");
+        return;
+      }
+
+      setForm(INITIAL_FORM);
+      setSelectedTransporterIds([]);
+      fetchRequests();
+      toast.success("RFQ submitted successfully");
+    } catch (err) {
+      toast.error("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function toggleTransporter(id) {
@@ -549,7 +605,7 @@ export default function CompanyDashboard() {
           </h2>
 
           <Input
-            label="Loading Date"
+            label="Loading Date *"
             type="date"
             value={form.loading_date}
             onChange={(e) =>
@@ -558,7 +614,7 @@ export default function CompanyDashboard() {
           />
 
           <Select
-            label="Movement Type"
+            label="Movement Type *"
             value={form.movement_type}
             onChange={(e) =>
               setForm((f) => ({ ...f, movement_type: e.target.value }))
@@ -635,7 +691,7 @@ export default function CompanyDashboard() {
               </Select>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Container count"
+                  label="Container count *"
                   type="number"
                   value={form.container_count}
                   onChange={(e) =>
@@ -643,7 +699,7 @@ export default function CompanyDashboard() {
                   }
                 />
                 <Select
-                  label="Container size"
+                  label="Container size *"
                   value={form.container_size}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, container_size: e.target.value }))
@@ -655,7 +711,7 @@ export default function CompanyDashboard() {
                 </Select>
               </div>
               <Input
-                label="Weight per container (MT)"
+                label="Weight per container (MT) *"
                 type="number"
                 step="0.01"
                 value={form.weight_per_container}
@@ -664,7 +720,7 @@ export default function CompanyDashboard() {
                 }
               />
               <Select
-                label="Import / Export"
+                label="Import / Export *"
                 value={form.import_export}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, import_export: e.target.value }))
@@ -675,7 +731,7 @@ export default function CompanyDashboard() {
                 <option value="Export">Export</option>
               </Select>
               <Select
-                label="Port lane"
+                label="Port lane *"
                 value={form.port_lane}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, port_lane: e.target.value }))
@@ -687,7 +743,7 @@ export default function CompanyDashboard() {
                 ))}
               </Select>
               <Input
-                label="Cut-off date"
+                label="Cut-off date *"
                 type="date"
                 value={form.cutoff_date}
                 onChange={(e) =>
@@ -721,7 +777,7 @@ export default function CompanyDashboard() {
                 ))}
               </Select>
               <Select
-                label="Truck type"
+                label="Truck type *"
                 value={form.truck_type}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, truck_type: e.target.value }))
@@ -732,7 +788,7 @@ export default function CompanyDashboard() {
                 <option value="Flatbed">Flatbed</option>
               </Select>
               <Select
-                label="Bed size"
+                label="Bed size *"
                 value={form.bed_size}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, bed_size: e.target.value }))
@@ -743,7 +799,7 @@ export default function CompanyDashboard() {
                 <option value="40ft">40ft</option>
               </Select>
               <Input
-                label="Total weight (MT)"
+                label="Total weight (MT) *"
                 type="number"
                 step="0.01"
                 value={form.total_weight}
@@ -752,7 +808,7 @@ export default function CompanyDashboard() {
                 }
               />
               <Select
-                label="Upcountry lane"
+                label="Upcountry lane *"
                 value={form.upcountry_lane}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, upcountry_lane: e.target.value }))
@@ -764,7 +820,7 @@ export default function CompanyDashboard() {
                 ))}
               </Select>
               <Input
-                label="Customer name"
+                label="Customer name *"
                 value={form.customer_name}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, customer_name: e.target.value }))
