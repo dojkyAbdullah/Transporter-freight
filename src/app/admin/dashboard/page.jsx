@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import toast from "react-hot-toast";
 
 const ROLES = [
   { value: "ADMIN", label: "Admin" },
@@ -11,21 +12,21 @@ const ROLES = [
 ];
 
 const Input = ({ label, ...props }) => (
-  <div className="space-y-1">
+  <div className="space-y-1.5">
     <label className="text-sm font-medium text-slate-700">{label}</label>
     <input
       {...props}
-      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 sm:py-2 text-slate-900 bg-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
     />
   </div>
 );
 
 const Select = ({ label, children, ...props }) => (
-  <div className="space-y-1">
+  <div className="space-y-1.5">
     <label className="text-sm font-medium text-slate-700">{label}</label>
     <select
       {...props}
-      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 sm:py-2 text-slate-900 bg-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
     >
       {children}
     </select>
@@ -75,6 +76,26 @@ export default function AdminDashboard() {
     init();
   }, [router]);
 
+  // Real-time: refetch users when users table changes
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel("admin-users-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   async function fetchUsers() {
     if (!currentUserId) return;
     const res = await fetch(`/api/admin/users?caller_id=${currentUserId}`);
@@ -86,8 +107,41 @@ export default function AdminDashboard() {
     router.replace("/auth/login");
   }
 
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const MIN_PASSWORD_LENGTH = 6;
+
   async function handleCreateUser(e) {
     e.preventDefault();
+    const name = String(form.name ?? "").trim();
+    const email = String(form.email ?? "").trim();
+    const password = String(form.password ?? "");
+    const role = form.role;
+
+    if (!name) {
+      toast.error("Full name is required");
+      return;
+    }
+    if (!email) {
+      toast.error("Email is required");
+      return;
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (!password) {
+      toast.error("Password is required");
+      return;
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+    if (!role) {
+      toast.error("Please select a role");
+      return;
+    }
+
     setCreating(true);
     const { data: auth } = await supabase.auth.getUser();
     const res = await fetch("/api/admin/create-user", {
@@ -101,48 +155,59 @@ export default function AdminDashboard() {
     const data = await res.json();
     setCreating(false);
     if (!res.ok) {
-      alert(data.error || "Failed to create user");
+      toast.error(data.error || "Failed to create user");
       return;
     }
     setForm({ email: "", password: "", name: "", role: "INLAND_EXECUTIVE", company_name: "" });
     fetchUsers();
+    toast.success("User created successfully");
   }
 
   if (currentUserId === null) {
-    return <p className="p-4">Loading...</p>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <p className="text-slate-600">Loading...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
-        <div className="flex items-center gap-4">
+    <div className="min-h-dvh bg-slate-50 dashboard-container p-4 sm:p-6 lg:p-8 pb-8 sm:pb-12">
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <a
+            href="/auth/signup"
+            className="inline-flex items-center px-3 py-2 rounded-xl border border-blue-600 text-blue-600 hover:bg-blue-50 text-sm sm:text-base font-medium transition-colors"
+          >
+            Create user
+          </a>
           <a
             href="/company/dashboard"
-            className="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition"
+            className="inline-flex items-center px-3 py-2 sm:px-4 rounded-xl bg-blue-600 text-white text-sm sm:text-base font-medium hover:bg-blue-700 transition-colors"
           >
             Create requests (Inland Executive)
           </a>
           <a
             href="/dashboard"
-            className="text-slate-600 hover:text-slate-900 font-medium"
+            className="inline-flex items-center px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-sm sm:text-base transition-colors"
           >
             ← Back to app
           </a>
           <button
             type="button"
             onClick={handleLogout}
-            className="text-slate-600 hover:text-slate-900 font-medium"
+            className="inline-flex items-center px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-sm sm:text-base transition-colors"
           >
             Logout
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 max-w-[90rem]">
         {/* Create user */}
-        <div className="bg-white rounded-2xl shadow p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-slate-800">Create User / Role</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-4">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-800">Create User / Role</h2>
           <form onSubmit={handleCreateUser} className="space-y-4">
             <Input
               label="Full Name"
@@ -183,7 +248,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={creating}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition font-medium disabled:opacity-60"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium disabled:opacity-60 text-base active:scale-[0.99]"
             >
               {creating ? "Creating..." : "Create User"}
             </button>
@@ -191,8 +256,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Users list */}
-        <div className="bg-white rounded-2xl shadow p-6 overflow-y-auto max-h-[85vh]">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Users & Roles</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-y-auto max-h-[70vh] sm:max-h-[75vh] lg:max-h-[85vh]">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-4">Users & Roles</h2>
           {loading ? (
             <p className="text-slate-500">Loading...</p>
           ) : (
@@ -200,21 +265,21 @@ export default function AdminDashboard() {
               {users.map((u) => (
                 <div
                   key={u.id}
-                  className="border border-slate-200 rounded-xl p-4 bg-slate-50"
+                  className="border border-slate-200 rounded-xl p-4 bg-slate-50/80"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-slate-900">{u.name}</p>
-                      <p className="text-sm text-slate-600">{u.email}</p>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 truncate">{u.name}</p>
+                      <p className="text-sm text-slate-600 break-all">{u.email}</p>
                       {u.company_name && (
                         <p className="text-xs text-slate-500">{u.company_name}</p>
                       )}
                     </div>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold
+                      className={`shrink-0 w-fit px-2.5 py-1 rounded-full text-xs font-semibold
                         ${u.role === "ADMIN" ? "bg-amber-100 text-amber-800" : ""}
-                        ${u.role === "INLAND_EXECUTIVE" ? "bg-blue-100 text-blue-800" : ""}
-                        ${u.role === "TRANSPORTER" ? "bg-green-100 text-green-800" : ""}`}
+                        ${u.role === "INLAND_EXECUTIVE" ? "bg-sky-100 text-sky-800" : ""}
+                        ${u.role === "TRANSPORTER" ? "bg-blue-100 text-blue-800" : ""}`}
                     >
                       {u.role.replace("_", " ")}
                     </span>

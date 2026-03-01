@@ -7,7 +7,7 @@
 function Field({ label, value }) {
   const v = value ?? "";
   return (
-    <p className="text-sm text-slate-700">
+    <p className="text-sm text-slate-700 break-words">
       <span className="font-medium text-slate-800">{label}:</span>{" "}
       {String(v).trim() || "—"}
     </p>
@@ -37,7 +37,6 @@ export default function RequestDetails({ movement_type, form_data, formatted_req
       <div className="space-y-1.5 text-slate-700">
         <Field label="Movement" value="Upcountry" />
         <Field label="Commodity" value={form_data.upcountry_commodity} />
-        <Field label="Container count" value={form_data.upcountry_container_count} />
         <Field label="Truck type" value={form_data.truck_type} />
         <Field label="Bed size" value={form_data.bed_size} />
         <Field label="Total weight (MT)" value={form_data.total_weight} />

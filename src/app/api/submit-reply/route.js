@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "../../lib/supabaseServer";
 import { appendRatesToSheet } from "../../lib/googleSheets";
 import { getUserRole, canGiveQuotes } from "../../lib/getUserRole";
+import { sendPushToUsers } from "../../lib/push";
 
 export async function POST(req) {
   const { request_id, transporter_id, rate_pkr, availability_date, remarks } =
@@ -101,6 +102,26 @@ export async function POST(req) {
       updated_at: new Date().toISOString(),
     },
   ]);
+
+  // Push: notify executive (company) and all admins
+  const { data: adminUsers } = await supabaseServer
+    .from("users")
+    .select("id")
+    .eq("role", "ADMIN");
+  const adminIds = (adminUsers || []).map((u) => u.id);
+  const notifyUserIds = [
+    request.company_id,
+    ...adminIds.filter((id) => id !== request.company_id),
+  ].filter(Boolean);
+  if (notifyUserIds.length > 0) {
+    const transporterName = transporter?.name || "A transporter";
+    sendPushToUsers(notifyUserIds, {
+      title: "New rate submitted",
+      body: `${transporterName} submitted PKR ${rate_pkr} – open the app to view.`,
+      url: "/company/dashboard",
+      tag: "new-reply",
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ success: true });
 }

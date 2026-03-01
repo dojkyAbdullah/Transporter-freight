@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../lib/supabaseServer";
 import { getUserRole, canCreateRequests } from "../../lib/getUserRole";
+import { sendPushToUsers } from "../../lib/push";
 
 export async function POST(req) {
   const body = await req.json();
@@ -42,7 +43,6 @@ Special instructions: ${body.special_instructions || "—"}
     formatted = `
 Upcountry Dispatch
 Commodity: ${body.upcountry_commodity || ""}
-Container count: ${body.upcountry_container_count ?? ""}
 Truck type: ${body.truck_type || ""}
 Bed size: ${body.bed_size || ""}
 Weight: ${body.total_weight ?? ""} MT
@@ -59,7 +59,7 @@ Special instructions: ${body.upcountry_instructions || "—"}
       ? target_transporter_ids
       : null;
 
-  const { error } = await supabaseServer
+  const { data: inserted, error } = await supabaseServer
     .from("requests")
     .insert({
       company_id,
@@ -68,7 +68,9 @@ Special instructions: ${body.upcountry_instructions || "—"}
       formatted_request_text: formatted,
       form_data: body,
       target_transporter_ids: targetIds,
-    });
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error(error);
@@ -76,6 +78,26 @@ Special instructions: ${body.upcountry_instructions || "—"}
       { error: error.message },
       { status: 500 }
     );
+  }
+
+  // Push: notify selected transporters (or all transporters if none selected)
+  let transporterUserIds = targetIds;
+  if (!transporterUserIds?.length) {
+    const { data: transporters } = await supabaseServer
+      .from("users")
+      .select("id")
+      .eq("role", "TRANSPORTER");
+    transporterUserIds = (transporters || []).map((u) => u.id);
+  }
+  if (transporterUserIds.length > 0) {
+    const movementLabel = movement_type === "PORT" ? "Port" : "Upcountry";
+    const commodity = movement_type === "PORT" ? body.port_commodity : body.upcountry_commodity;
+    sendPushToUsers(transporterUserIds, {
+      title: "New freight request",
+      body: `${movementLabel} – ${commodity || "New request"}. Open the app to view and submit your rate.`,
+      url: "/transporter/dashboard",
+      tag: "new-request",
+    }).catch(() => {});
   }
 
   return NextResponse.json({ success: true });

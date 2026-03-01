@@ -42,15 +42,17 @@ export default function DashboardRedirect() {
   }
 
   return (
-    <div className="p-4 flex items-center justify-between">
-      <p>Redirecting...</p>
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="text-slate-600 hover:text-slate-900 font-medium text-sm"
-      >
-        Logout
-      </button>
+    <div className="min-h-dvh bg-slate-50 flex flex-col items-center justify-center p-4 sm:p-6 dashboard-container">
+      <div className="flex flex-col sm:flex-row items-center justify-between w-full max-w-md gap-4">
+        <p className="text-slate-600 text-base sm:text-lg">Redirecting...</p>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-sm transition-colors"
+        >
+          Logout
+        </button>
+      </div>
     </div>
   );
 }

@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import RequestDetails from "../../components/RequestDetails";
+import toast from "react-hot-toast";
 
 const Input = ({ label, disabled, ...props }) => (
-  <div className="space-y-1">
+  <div className="space-y-1.5">
     <label className="text-sm font-medium text-slate-700">{label}</label>
     <input
       disabled={disabled}
       {...props}
-      className={`w-full rounded-lg border px-3 py-2
+      className={`w-full rounded-xl border border-slate-200 px-3 py-2.5 sm:py-2 text-base sm:text-sm
         ${disabled ? "bg-slate-100 text-slate-400" : "bg-white text-slate-900"}
-        focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow`}
     />
   </div>
 );
@@ -81,42 +82,71 @@ export default function TransporterDashboard() {
     };
   }, [router]);
 
- async function submitRate(requestId) {
-  const payload = rates[requestId];
+  // Real-time: refetch when requests change (new request, status update, etc.)
+  useEffect(() => {
+    if (!accessAllowed) return;
 
-  if (!payload?.rate_pkr) {
-    alert("Please enter rate");
-    return;
+    const channel = supabase
+      .channel("transporter-requests-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "requests" },
+        () => {
+          fetchRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [accessAllowed]);
+
+  async function submitRate(requestId) {
+    const payload = rates[requestId];
+    const ratePkr = payload?.rate_pkr != null && String(payload.rate_pkr).trim() !== "";
+
+    if (!ratePkr) {
+      toast.error("Please enter rate (PKR)");
+      return;
+    }
+
+    if (!payload?.availability_date) {
+      toast.error("Please select availability date");
+      return;
+    }
+
+    const numRate = parseFloat(payload.rate_pkr);
+    if (Number.isNaN(numRate) || numRate < 0) {
+      toast.error("Please enter a valid rate");
+      return;
+    }
+
+    setLoadingId(requestId);
+
+    const { data: auth } = await supabase.auth.getUser();
+
+    const res = await fetch("/api/submit-reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        request_id: requestId,
+        transporter_id: auth.user.id,
+        ...payload,
+      }),
+    });
+
+    const result = await res.json();
+    setLoadingId(null);
+
+    if (!res.ok) {
+      toast.error(result.error || "Failed to save rate");
+      return;
+    }
+
+    toast.success("Rate saved successfully");
+    fetchRequests();
   }
-
-  if (!payload?.availability_date) {
-    alert("Please select availability date");
-    return;
-  }
-
-  setLoadingId(requestId);
-
-  const { data: auth } = await supabase.auth.getUser();
-
-  const res = await fetch("/api/submit-reply", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      request_id: requestId,
-      transporter_id: auth.user.id,
-      ...payload,
-    }),
-  });
-
-  const result = await res.json();
-
-  if (!res.ok) {
-    alert(result.error);
-  }
-
-  setLoadingId(null);
-  fetchRequests();
-}
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -124,38 +154,42 @@ export default function TransporterDashboard() {
   }
 
   if (!accessAllowed) {
-    return <p className="p-4">Checking access...</p>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <p className="text-slate-600">Checking access...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">
+    <div className="min-h-dvh bg-slate-50 dashboard-container p-4 sm:p-6 lg:p-8 pb-8 sm:pb-12">
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
           Transporter Dashboard
         </h1>
         <button
           type="button"
           onClick={handleLogout}
-          className="text-slate-600 hover:text-slate-900 font-medium"
+          className="inline-flex items-center px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-sm sm:text-base transition-colors w-fit"
         >
           Logout
         </button>
-      </div>
+      </header>
 
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8 w-full max-w-[90rem]">
         {requests.map((r) => {
           const isClosed = r.status === "CLOSED";
 
           return (
             <div
               key={r.id}
-              className="bg-white rounded-2xl shadow p-6 space-y-6"
+              className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-5 sm:space-y-6"
             >
               {/* HEADER */}
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold text-white
-                    ${isClosed ? "bg-red-600" : "bg-green-600"}`}
+                  className={`inline-flex w-fit px-3 py-1 rounded-full text-xs font-semibold text-white
+                    ${isClosed ? "bg-rose-600" : "bg-blue-600"}`}
                 >
                   {r.status}
                 </span>
@@ -175,13 +209,13 @@ export default function TransporterDashboard() {
               </div>
 
               {isClosed && (
-                <p className="text-sm text-red-600 font-medium">
+                <p className="text-sm text-rose-600 font-medium">
                   🚫 This request is closed. Bidding disabled.
                 </p>
               )}
 
               {/* INPUTS */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <Input
                   label="Rate (PKR)"
                   type="number"
@@ -230,13 +264,13 @@ export default function TransporterDashboard() {
                 <button
                   onClick={() => submitRate(r.id)}
                   disabled={isClosed || loadingId === r.id}
-                  className={`px-6 py-2 rounded-xl font-medium transition
+                  className={`w-full sm:w-auto min-h-11 px-6 py-2.5 sm:py-2 rounded-xl font-medium transition text-base sm:text-sm
                   ${
                     isClosed
-                      ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                       : loadingId === r.id
-                      ? "bg-slate-300 text-slate-600"
-                      : "bg-indigo-600 text-white hover:bg-indigo-700"
+                      ? "bg-slate-200 text-slate-600"
+                      : "bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.99]"
                   }`}
                 >
                   {loadingId === r.id ? "Saving..." : "Save / Update Rate"}

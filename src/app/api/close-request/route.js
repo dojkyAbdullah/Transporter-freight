@@ -10,8 +10,7 @@ function getRequestedTotal(request) {
     return Number.isFinite(n) && n > 0 ? n : 1;
   }
   if (request.movement_type === "UPCOUNTRY") {
-    const n = parseInt(fd.upcountry_container_count, 10);
-    return Number.isFinite(n) && n > 0 ? n : 1;
+    return Infinity; // Open allocation: no fixed count
   }
   return 1;
 }
@@ -61,7 +60,7 @@ export async function POST(req) {
     0
   );
 
-  if (totalAllocated > requestedTotal) {
+  if (request.movement_type === "PORT" && totalAllocated > requestedTotal) {
     return NextResponse.json(
       {
         error: `Total allocated (${totalAllocated}) cannot exceed requested count (${requestedTotal}).`,
