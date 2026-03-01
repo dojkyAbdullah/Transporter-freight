@@ -45,6 +45,7 @@ export default function AdminDashboard() {
     name: "",
     role: "INLAND_EXECUTIVE",
     company_name: "",
+    phone: "",
   });
 
   useEffect(() => {
@@ -158,7 +159,7 @@ export default function AdminDashboard() {
       toast.error(data.error || "Failed to create user");
       return;
     }
-    setForm({ email: "", password: "", name: "", role: "INLAND_EXECUTIVE", company_name: "" });
+    setForm({ email: "", password: "", name: "", role: "INLAND_EXECUTIVE", company_name: "", phone: "" });
     fetchUsers();
     toast.success("User created successfully");
   }
@@ -245,6 +246,13 @@ export default function AdminDashboard() {
               value={form.company_name}
               onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
             />
+            <Input
+              label="Phone (optional, for WhatsApp alerts)"
+              type="tel"
+              placeholder="e.g. 03001234567 or 923001234567"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            />
             <button
               type="submit"
               disabled={creating}
@@ -273,6 +281,9 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-600 break-all">{u.email}</p>
                       {u.company_name && (
                         <p className="text-xs text-slate-500">{u.company_name}</p>
+                      )}
+                      {u.phone && (
+                        <p className="text-xs text-slate-500">📱 {u.phone}</p>
                       )}
                     </div>
                     <span

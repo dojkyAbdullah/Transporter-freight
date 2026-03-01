@@ -55,38 +55,3 @@ function isCacheable(url) {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
-
-self.addEventListener("push", (event) => {
-  let data = { title: "Freight Collection", body: "", url: "/", tag: "freight" };
-  if (event.data) {
-    try {
-      data = { ...data, ...event.data.json() };
-    } catch (_) {}
-  }
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      tag: data.tag,
-      icon: "/icons/icon.svg",
-      badge: "/icons/icon.svg",
-      data: { url: data.url },
-      requireInteraction: false,
-    })
-  );
-});
-
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = event.notification.data?.url || "/";
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url && "focus" in client) {
-          client.navigate(url);
-          return client.focus();
-        }
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
-  );
-});

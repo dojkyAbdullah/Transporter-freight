@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
 import { getUserRole, isAdmin } from "../../../lib/getUserRole";
 
+/** Normalize to digits only with country code (e.g. 923001234567). Assumes Pakistan 92 if 10 digits. */
+function normalizePhoneForWhatsApp(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  if (digits.length >= 11) return digits;
+  if (digits.length === 10 && digits.startsWith("3")) return "92" + digits;
+  if (digits.length === 10) return "92" + digits;
+  return digits ? "92" + digits : null;
+}
+
 export async function POST(req) {
   const body = await req.json();
   const {
@@ -11,6 +20,7 @@ export async function POST(req) {
     name,
     role,
     company_name,
+    phone,
   } = body;
 
   if (!created_by_user_id || !email || !password || !name || !role) {
@@ -64,6 +74,7 @@ export async function POST(req) {
     email,
     role,
     company_name: company_name || null,
+    phone: phone ? normalizePhoneForWhatsApp(phone) : null,
   });
 
   if (insertError) {

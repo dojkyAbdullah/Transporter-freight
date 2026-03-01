@@ -54,6 +54,7 @@ export default function SignupPage() {
     const name = String(form.get("name") ?? "").trim();
     const role = form.get("role");
     const company_name = String(form.get("company_name") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
 
     if (!name) {
       toast.error("Full name is required");
@@ -92,6 +93,7 @@ export default function SignupPage() {
         name,
         role,
         company_name: company_name || undefined,
+        phone: phone || undefined,
       }),
     });
 
@@ -173,6 +175,15 @@ export default function SignupPage() {
               <input
                 name="company_name"
                 placeholder="Company name"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 bg-white text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone (optional, for WhatsApp alerts)</label>
+              <input
+                name="phone"
+                type="tel"
+                placeholder="e.g. 03001234567 or 923001234567"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 bg-white text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
               />
             </div>

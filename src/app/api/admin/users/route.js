@@ -21,7 +21,7 @@ export async function GET(req) {
 
   const { data: users, error } = await supabaseServer
     .from("users")
-    .select("id, name, email, role, company_name, created_at")
+    .select("id, name, email, role, company_name, phone, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {

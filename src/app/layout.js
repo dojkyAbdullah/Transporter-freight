@@ -3,7 +3,6 @@ import "./globals.css";
 import Toaster from "./components/Toaster";
 import OfflineBanner from "./components/OfflineBanner";
 import PwaRegister from "./components/PwaRegister";
-import PushNotificationSetup from "./components/PushNotificationSetup";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +43,6 @@ export default function RootLayout({ children }) {
         {children}
         <Toaster />
         <PwaRegister />
-        <PushNotificationSetup />
       </body>
     </html>
   );
