@@ -27,8 +27,6 @@ export default function PushNotificationSetup() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [session, setSession] = useState(null);
   const [alreadySubscribed, setAlreadySubscribed] = useState(false);
-  const autoRequested = useRef(false);
-  const autoRequestTimeout = useRef(null);
   const hasSubscriptionRef = useRef(false);
 
   const subscribe = async () => {
@@ -137,59 +135,15 @@ export default function PushNotificationSetup() {
         return;
       }
 
-      // Show prompt after short delay so SW has a chance to be ready
+      // Show in-app prompt only (no auto browser prompt). User taps "Enable" to trigger permission.
       showTimeoutId = setTimeout(() => {
         if (mounted && !hasSubscriptionRef.current) setShowPrompt(true);
       }, 1500);
-
-      // Auto-request permission after 3s if VAPID set and still default (optional nudge)
-      if (vapidPublic && Notification.permission === "default" && !autoRequested.current) {
-        autoRequested.current = true;
-        autoRequestTimeout.current = setTimeout(async () => {
-          if (!mounted) return;
-          try {
-            const permission = await Notification.requestPermission();
-            if (permission === "granted") {
-              const reg2 = await navigator.serviceWorker.ready;
-              let sub2 = await reg2.pushManager.getSubscription();
-              if (!sub2) {
-                sub2 = await reg2.pushManager.subscribe({
-                  userVisibleOnly: true,
-                  applicationServerKey: urlBase64ToUint8Array(vapidPublic),
-                });
-              }
-              const payload = sub2.toJSON
-                ? sub2.toJSON()
-                : {
-                    endpoint: sub2.endpoint,
-                    keys: {
-                      p256dh: arrayBufferToBase64url(sub2.getKey("p256dh")),
-                      auth: arrayBufferToBase64url(sub2.getKey("auth")),
-                    },
-                  };
-              const res = await fetch("/api/push-subscribe", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${s.access_token}`,
-                },
-                body: JSON.stringify(payload),
-              });
-              if (res.ok && mounted) {
-                setShowPrompt(false);
-                setAlreadySubscribed(true);
-                toast.success("Notifications enabled");
-              }
-            }
-          } catch (_) {}
-        }, 3000);
-      }
     })();
 
     return () => {
       mounted = false;
       if (showTimeoutId) clearTimeout(showTimeoutId);
-      if (autoRequestTimeout.current) clearTimeout(autoRequestTimeout.current);
     };
   }, []);
 
