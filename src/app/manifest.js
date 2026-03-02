@@ -1,6 +1,6 @@
 export default function manifest() {
   return {
-    name: "Freight Collection",
+    name: "Gatronova Trucking Portal",
     short_name: "Gatronova Trucking Portal",
     description: "Freight collection and RFQ portal – works offline",
     start_url: "/",
