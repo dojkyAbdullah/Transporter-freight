@@ -16,7 +16,7 @@ export async function PATCH(req, { params }) {
   const { id: targetUserId } = await params;
 
   const body = await req.json();
-  const { caller_id, name, role, company_name, phone } = body;
+  const { caller_id, name, role, company_name, phone, password } = body;
 
   if (!caller_id) {
     return NextResponse.json({ error: "caller_id required" }, { status: 400 });
@@ -40,6 +40,24 @@ export async function PATCH(req, { params }) {
     );
   }
 
+  // ── Optional: update auth password ────────────────────────────
+  if (password !== undefined && password !== "") {
+    if (typeof password !== "string" || password.length < 6) {
+      return NextResponse.json(
+        { error: "Password must be at least 6 characters" },
+        { status: 400 }
+      );
+    }
+    const { error: pwError } = await supabaseServer.auth.admin.updateUserById(
+      targetUserId,
+      { password }
+    );
+    if (pwError) {
+      return NextResponse.json({ error: pwError.message }, { status: 400 });
+    }
+  }
+
+  // ── Update profile fields ───────────────────────────────────────
   // Build update payload — only include provided fields
   const updates = {};
   if (name !== undefined) updates.name = name.trim();
@@ -49,7 +67,9 @@ export async function PATCH(req, { params }) {
     updates.phone = phone ? normalizePhoneForWhatsApp(phone) : null;
   }
 
+  // If only password was changed (no profile fields), return early with success
   if (Object.keys(updates).length === 0) {
+    if (password) return NextResponse.json({ success: true, user: null });
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
