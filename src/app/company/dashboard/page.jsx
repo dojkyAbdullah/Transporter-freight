@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import RequestDetails from "../../components/RequestDetails";
@@ -203,6 +203,48 @@ export default function CompanyDashboard() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [closeAllocationQuantities, setCloseAllocationQuantities] = useState({});
   const [userRole, setUserRole] = useState(null);
+
+  // Requests panel: search / filter / pagination
+  const [reqSearch, setReqSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");   // ALL | OPEN | CLOSED
+  const [moveFilter, setMoveFilter] = useState("ALL");       // ALL | PORT | UPCOUNTRY
+  const REQ_PAGE_SIZE = 10;
+  const [reqPage, setReqPage] = useState(1);
+
+  // Reset to page 1 when filters/search change
+  useEffect(() => { setReqPage(1); }, [reqSearch, statusFilter, moveFilter]);
+
+  const filteredRequests = useMemo(() => {
+    const q = reqSearch.trim().toLowerCase();
+    return requests.filter((r) => {
+      const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
+      const matchMove   = moveFilter  === "ALL" || r.movement_type === moveFilter;
+      if (!matchStatus || !matchMove) return false;
+      if (!q) return true;
+      const fd = r.form_data ?? {};
+      return (
+        r.reference_number?.toLowerCase().includes(q) ||
+        fd.port_lane?.toLowerCase().includes(q) ||
+        fd.upcountry_lane?.toLowerCase().includes(q) ||
+        fd.port_commodity?.toLowerCase().includes(q) ||
+        fd.upcountry_commodity?.toLowerCase().includes(q) ||
+        fd.customer_name?.toLowerCase().includes(q) ||
+        r.movement_type?.toLowerCase().includes(q)
+      );
+    });
+  }, [requests, reqSearch, statusFilter, moveFilter]);
+
+  const reqTotalPages = Math.max(1, Math.ceil(filteredRequests.length / REQ_PAGE_SIZE));
+  const pagedRequests = filteredRequests.slice((reqPage - 1) * REQ_PAGE_SIZE, reqPage * REQ_PAGE_SIZE);
+
+  function reqStatusCount(s) {
+    if (s === "ALL") return requests.filter(r => moveFilter === "ALL" || r.movement_type === moveFilter).length;
+    return requests.filter(r => r.status === s && (moveFilter === "ALL" || r.movement_type === moveFilter)).length;
+  }
+  function reqMoveCount(m) {
+    if (m === "ALL") return requests.filter(r => statusFilter === "ALL" || r.status === statusFilter).length;
+    return requests.filter(r => r.movement_type === m && (statusFilter === "ALL" || r.status === statusFilter)).length;
+  }
 
   async function fetchRequests() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -849,12 +891,101 @@ export default function CompanyDashboard() {
         </div>
 
         {/* ================= REQUESTS ================= */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-y-auto max-h-[70vh] sm:max-h-[75vh] lg:max-h-[85vh]">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-4">
-            Submitted Requests
-          </h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 flex flex-col gap-4 max-h-[90vh]">
 
-          {requests.map((r) => (
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+              Submitted Requests
+              <span className="ml-2 text-sm font-normal text-slate-400">
+                ({filteredRequests.length}{filteredRequests.length !== requests.length ? ` of ${requests.length}` : ""})
+              </span>
+            </h2>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search by lane, commodity, customer, ref no…"
+              value={reqSearch}
+              onChange={(e) => setReqSearch(e.target.value)}
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            />
+            {reqSearch && (
+              <button onClick={() => setReqSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label="Clear search">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Status filter tabs */}
+          <div className="flex gap-1.5 flex-wrap">
+            {[
+              { value: "ALL",    label: "All" },
+              { value: "OPEN",   label: "Open",   active: "bg-blue-600 text-white" },
+              { value: "CLOSED", label: "Closed", active: "bg-rose-600 text-white" },
+            ].map((tab) => (
+              <button key={tab.value} type="button"
+                onClick={() => setStatusFilter(tab.value)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                  statusFilter === tab.value
+                    ? (tab.active ?? "bg-slate-800 text-white") + " border-transparent shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}>
+                {tab.label}
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  statusFilter === tab.value ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {reqStatusCount(tab.value)}
+                </span>
+              </button>
+            ))}
+            {[
+              { value: "PORT",      label: "Port",      active: "bg-sky-600 text-white" },
+              { value: "UPCOUNTRY", label: "Upcountry", active: "bg-emerald-600 text-white" },
+            ].map((tab) => (
+              <button key={tab.value} type="button"
+                onClick={() => setMoveFilter((prev) => prev === tab.value ? "ALL" : tab.value)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                  moveFilter === tab.value
+                    ? tab.active + " border-transparent shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}>
+                {tab.label}
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  moveFilter === tab.value ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {reqMoveCount(tab.value)}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Empty state */}
+          {filteredRequests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <svg className="w-10 h-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <p className="text-slate-500 text-sm">No requests match your filters.</p>
+              <button onClick={() => { setReqSearch(""); setStatusFilter("ALL"); setMoveFilter("ALL"); }}
+                className="mt-2 text-blue-600 text-xs hover:underline">Clear filters</button>
+            </div>
+          ) : (
+            <div className="overflow-y-auto flex-1 space-y-0">
+
+          {pagedRequests.map((r) => (
             <div
               key={r.id}
               className="border border-slate-200 rounded-xl p-4 mb-4 bg-slate-50/80"
@@ -1060,6 +1191,65 @@ export default function CompanyDashboard() {
               ))}
             </div>
           ))}
+
+            </div>
+          )}
+
+          {/* Pagination */}
+          {reqTotalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 shrink-0">
+              <p className="text-xs text-slate-500">
+                Page {reqPage} of {reqTotalPages} &mdash; {filteredRequests.length} request{filteredRequests.length !== 1 ? "s" : ""}
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setReqPage(1)} disabled={reqPage === 1}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition" title="First">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button onClick={() => setReqPage((p) => Math.max(1, p - 1))} disabled={reqPage === 1}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition" title="Previous">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {Array.from({ length: reqTotalPages }, (_, i) => i + 1)
+                  .filter((n) => n === 1 || n === reqTotalPages || Math.abs(n - reqPage) <= 1)
+                  .reduce((acc, n, idx, arr) => {
+                    if (idx > 0 && n - arr[idx - 1] > 1) acc.push("…");
+                    acc.push(n);
+                    return acc;
+                  }, [])
+                  .map((item, i) =>
+                    item === "…" ? (
+                      <span key={`ellipsis-${i}`} className="px-1 text-slate-400 text-xs">…</span>
+                    ) : (
+                      <button key={item} onClick={() => setReqPage(item)}
+                        className={`w-7 h-7 rounded-lg text-xs font-medium transition ${
+                          reqPage === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+                        }`}>
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                <button onClick={() => setReqPage((p) => Math.min(reqTotalPages, p + 1))} disabled={reqPage === reqTotalPages}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition" title="Next">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button onClick={() => setReqPage(reqTotalPages)} disabled={reqPage === reqTotalPages}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition" title="Last">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
