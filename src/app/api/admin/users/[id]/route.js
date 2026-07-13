@@ -86,3 +86,34 @@ export async function PATCH(req, { params }) {
 
   return NextResponse.json({ success: true, user: data });
 }
+
+export async function DELETE(req, { params }) {
+  const { id: targetUserId } = await params;
+  const caller_id = req.nextUrl.searchParams.get("caller_id");
+
+  if (!caller_id) {
+    return NextResponse.json({ error: "caller_id required" }, { status: 400 });
+  }
+
+  if (!targetUserId) {
+    return NextResponse.json({ error: "User id required" }, { status: 400 });
+  }
+
+  // Only ADMIN can delete users
+  const callerRole = await getUserRole(caller_id);
+  if (!isAdmin(callerRole)) {
+    return NextResponse.json({ error: "Only Admin can delete users" }, { status: 403 });
+  }
+
+  // Note: if there is a trigger on auth.users or cascade delete setup,
+  // deleting from auth might be enough. We'll do both explicitly or rely on auth.
+  const { error: authError } = await supabaseServer.auth.admin.deleteUser(targetUserId);
+  if (authError) {
+    return NextResponse.json({ error: authError.message }, { status: 500 });
+  }
+
+  // Also delete from public.users just in case there's no cascade
+  await supabaseServer.from("users").delete().eq("id", targetUserId);
+
+  return NextResponse.json({ success: true });
+}

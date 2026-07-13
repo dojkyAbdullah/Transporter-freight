@@ -109,7 +109,7 @@ export default function SignupPage() {
       toast.success("User created successfully. They can log in with the email and password you set.");
     } catch (error) {
       console.error(error);
-      toast.error("An unexpected error occurred");
+      toast.error(error.message || "An unexpected error occurred");
     } finally {
       setLoading(false);
     }

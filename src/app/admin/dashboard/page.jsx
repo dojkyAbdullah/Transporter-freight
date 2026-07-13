@@ -40,7 +40,7 @@ const Select = ({ label, children, ...props }) => (
 );
 
 /* ── Edit User Modal ───────────────────────────────────────────── */
-function EditUserModal({ user, currentUserId, onClose, onSaved }) {
+function EditUserModal({ user, currentUserId, onClose, onSaved, onDelete }) {
   const [form, setForm] = useState({
     name: user.name ?? "",
     role: user.role ?? "TRANSPORTER",
@@ -50,6 +50,32 @@ function EditUserModal({ user, currentUserId, onClose, onSaved }) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}?caller_id=${currentUserId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete user");
+        return;
+      }
+      toast.success("User deleted successfully");
+      if (onDelete) onDelete(user.id);
+      onClose();
+    } catch (error) {
+      console.error(error);
+      toast.error("An unexpected error occurred while deleting");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -203,21 +229,32 @@ function EditUserModal({ user, currentUserId, onClose, onSaved }) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+              onClick={handleDelete}
+              disabled={deleting || saving}
+              className="px-4 py-2.5 rounded-xl border border-red-200 text-red-600 bg-red-50 text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-60"
             >
-              Cancel
+              {deleting ? "…" : "Delete"}
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
+            <div className="flex-1 flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={deleting || saving}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || deleting}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -348,7 +385,7 @@ export default function AdminDashboard() {
       toast.success("User created successfully");
     } catch (error) {
       console.error(error);
-      toast.error("An unexpected error occurred");
+      toast.error(error.message || "An unexpected error occurred");
     } finally {
       setCreating(false);
     }
@@ -359,6 +396,10 @@ export default function AdminDashboard() {
     setUsers((prev) =>
       prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
     );
+  }
+
+  function handleUserDeleted(deletedId) {
+    setUsers((prev) => prev.filter((u) => u.id !== deletedId));
   }
 
   // Derived: filtered + searched users
@@ -716,6 +757,7 @@ export default function AdminDashboard() {
           currentUserId={currentUserId}
           onClose={() => setEditingUser(null)}
           onSaved={handleUserSaved}
+          onDelete={handleUserDeleted}
         />
       )}
     </div>
