@@ -48,7 +48,8 @@ export default function SignupPage() {
 
   async function handleCreateUser(e) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const form = new FormData(formElement);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "").trim();
@@ -105,7 +106,7 @@ export default function SignupPage() {
         return;
       }
 
-      e.currentTarget.reset();
+      formElement.reset();
       toast.success("User created successfully. They can log in with the email and password you set.");
     } catch (error) {
       console.error(error);
