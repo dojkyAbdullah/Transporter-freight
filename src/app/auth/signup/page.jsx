@@ -82,31 +82,37 @@ export default function SignupPage() {
     }
 
     setLoading(true);
-    const { data: auth } = await supabase.auth.getUser();
-    const res = await fetch("/api/admin/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        created_by_user_id: auth.user.id,
-        email,
-        password,
-        name,
-        role,
-        company_name: company_name || undefined,
-        phone: phone || undefined,
-      }),
-    });
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          created_by_user_id: auth.user.id,
+          email,
+          password,
+          name,
+          role,
+          company_name: company_name || undefined,
+          phone: phone || undefined,
+        }),
+      });
 
-    const result = await res.json();
-    setLoading(false);
+      const result = await res.json();
 
-    if (!res.ok) {
-      toast.error(result.error || "Failed to create user");
-      return;
+      if (!res.ok) {
+        toast.error(result.error || "Failed to create user");
+        return;
+      }
+
+      e.currentTarget.reset();
+      toast.success("User created successfully. They can log in with the email and password you set.");
+    } catch (error) {
+      console.error(error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
     }
-
-    e.currentTarget.reset();
-    toast.success("User created successfully. They can log in with the email and password you set.");
   }
 
   if (checking) {

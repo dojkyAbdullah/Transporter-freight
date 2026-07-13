@@ -329,21 +329,29 @@ export default function AdminDashboard() {
     if (!role) { toast.error("Please select a role"); return; }
 
     setCreating(true);
-    const { data: auth } = await supabase.auth.getUser();
-    const res = await fetch("/api/admin/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ created_by_user_id: auth.user.id, ...form }),
-    });
-    const data = await res.json();
-    setCreating(false);
-    if (!res.ok) {
-      toast.error(data.error || "Failed to create user");
-      return;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ created_by_user_id: auth.user.id, ...form }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        toast.error(data.error || "Failed to create user");
+        return;
+      }
+      
+      setForm({ email: "", password: "", name: "", role: "INLAND_EXECUTIVE", company_name: "", phone: "" });
+      fetchUsers();
+      toast.success("User created successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setCreating(false);
     }
-    setForm({ email: "", password: "", name: "", role: "INLAND_EXECUTIVE", company_name: "", phone: "" });
-    fetchUsers();
-    toast.success("User created successfully");
   }
 
   /** Called by modal when save succeeds — patch local state immediately */
